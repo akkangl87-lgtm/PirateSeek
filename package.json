@@ -1,0 +1,14 @@
+{
+  "name": "pirateseek",
+  "version": "0.1.0",
+  "private": false,
+  "description": "A reliability-first local AI gateway CLI with provider routing and session-aware recovery.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/cli.js",
+    "test": "node --test",
+    "check": "node --check src/cli.js && node --check src/reliability.js && node --test"
+  },
+  "license": "MIT"
+}
