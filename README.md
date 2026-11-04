@@ -2,87 +2,68 @@
 
 **A reliability-first, local AI gateway with a CLI-first workflow.**
 
-PirateSeek routes requests across configured AI providers while making failures observable and recoverable. Initial development prioritizes a predictable CLI, safe defaults, bounded concurrency, explicit error classification, and testable reliability primitives.
+## Ask DeepSeek from the CLI
 
-> **Status: early foundation.** CLI and reliability primitives exist. HTTP gateway, provider adapters, durable sessions, and account routing are not implemented yet.
+PirateSeek uses your local FreeDeepseekAPI as the primary provider and the official DeepSeek API as an optional backup.
 
-## Requirements and quick start
-
-- Node.js 20+
-- No third-party runtime dependencies in the current foundation
+1. Start your own FreeDeepseekAPI service and make sure its health endpoint responds at `http://127.0.0.1:9655/health`.
+2. Install Node.js 20+.
+3. Set optional proxy auth and official backup key in environment (never commit secrets).
+4. Ask:
 
 ```sh
-npm test
+npm start -- ask "Привет! Объясни, как работает Python"
+```
+
+The result prints which provider answered. To enable fallback, set `DEEPSEEK_API_KEY`; official API usage may incur charges. See [DeepSeek API docs](https://api-docs.deepseek.com/api_samples/chat_curl/).
+
+Configuration variables are listed in [`.env.example`](.env.example). Node does not load `.env` automatically in this version: export variables in your shell or use Node's supported env-file option, for example `node --env-file=.env src/cli.js ask "Hi"`.
+
+## Provider behavior
+
+- Primary: local FreeDeepseekAPI `POST /v1/chat/completions` (default model alias `deepseek-chat`).
+- Backup: official `https://api.deepseek.com/v1/chat/completions`, only when `DEEPSEEK_API_KEY` is configured.
+- Fallback happens for network errors, timeouts, HTTP 408/429, or HTTP 5xx. Authentication and request errors are surfaced, not retried or redirected.
+- Requests are non-streaming and stateless from PirateSeek's point of view. Conversation/session management and streaming are not implemented.
+- Fallback may send the same prompt to a different provider. Do not use this for sensitive prompts unless you accept that data flow.
+
+FreeDeepseekAPI is an experimental proxy over DeepSeek Web's undocumented interface. It can break when upstream changes. Review its documentation and applicable service terms before use. Do not expose the local proxy to the public internet without authentication.
+
+## Requirements and checks
+
+- Node.js 20+
+- No third-party runtime dependencies
+
+```sh
+npm run check
 npm start -- help
 npm start -- doctor
 npm start -- version
 ```
 
+## Project stage
+
+Implemented: CLI `help/version/doctor/ask`, FreeDeepseekAPI adapter, optional official API fallback, reliability primitives, CI workflow.
+
+Not yet implemented: local HTTP gateway, provider routing policies, durable sessions, streaming, cancellation, conformance/live-provider tests.
+
 ## Principles
 
-- **Diagnose before retrying.** Authentication and PoW challenges are not blindly retried.
-- **Bound load.** Concurrency, queueing, retry counts, and delays must be finite.
-- **Keep secrets local.** Never commit provider cookies, auth dumps, tokens, or sensitive logs.
-- **Make routing explicit.** Policies and endpoint names should be inspectable.
-- **Preserve truthful session semantics.** Failover may require a new upstream session and transcript replay; seamless continuity is not assumed.
-- **Provider boundaries.** Normalize errors without hiding upstream causes.
-- **Compatibility by tests.** Target OpenAI-compatible API behavior first.
-
-## Roadmap
-
-1. **Foundation (current):** CLI, doctor, error taxonomy, concurrency gate, circuit breaker.
-2. **Gateway core:** loopback HTTP listener, authentication, request IDs and redacted logs.
-3. **Provider contract:** adapter interface and first configured upstream.
-4. **Routing:** endpoint policies, provider health, account selection, cooldowns and bounded failover.
-5. **Session durability:** local state, affinity, replay policy, cancellation and crash-safe writes.
-6. **Compatibility:** OpenAI-compatible chat, streaming, CLI diagnostics and conformance tests.
-7. **Hardening:** security review, load tests, docs and release automation.
-
-## Planned CLI
-
-- `doctor` — configuration/runtime checks
-- `serve` — start local gateway
-- `providers list|check` — inspect providers
-- `routes list` — inspect routing policies
-- `sessions list|inspect` — inspect local session metadata
-- `status` — health, queue and circuit states
-
-Not all commands are implemented.
-
-## Configuration and security
-
-See [`.env.example`](.env.example). Default bind is loopback. Remote binding must require explicit authentication and security guidance.
-
-Supply provider credentials using a supported secret mechanism, not committed config. Use only provider access you are authorized to use and respect service terms, quotas, and anti-abuse controls. Diagnostics must redact tokens, cookies, prompts, and sensitive headers.
+- Diagnose before retrying. Authentication and challenge errors are not blindly retried.
+- Bound concurrency, queueing, retry counts, and delays.
+- Keep secrets local. Never commit cookies, auth dumps, tokens, or sensitive logs.
+- Preserve truthful session semantics: seamless upstream continuity is not assumed.
+- Respect provider terms, quotas, and anti-abuse controls.
 
 ## Architecture
 
 ```text
-CLI
- ├─ Config & secret references
- ├─ Local gateway (future)
- │   ├─ Auth / request limits
- │   ├─ Session manager
- │   └─ Router
- │       ├─ Health & circuit policy
- │       ├─ Concurrency / cooldowns
- │       └─ Provider adapters
- └─ Doctor / diagnostics
+CLI ask
+  └─ FreeDeepseekAPI adapter (local OpenAI-compatible endpoint)
+       └─ optional fallback: official DeepSeek API
 ```
 
-See [docs/architecture.md](docs/architecture.md) for reference-project synthesis and design decisions.
-
-## Development
-
-```sh
-npm run check
-```
-
-Use deterministic tests with fake upstreams and injectable clocks, not live provider credentials.
-
-## Security reports
-
-Do not publish credentials, cookies, PoW material, or unredacted request transcripts in issues.
+See [docs/architecture.md](docs/architecture.md).
 
 ## License
 
