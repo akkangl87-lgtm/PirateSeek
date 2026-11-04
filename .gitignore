@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.pirateseek/
+data/
+*.log
+coverage/
+.DS_Store
+deepseek-auth*.json
+accounts/
